@@ -1,26 +1,298 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   CSS DESIGN TOKENS — Dark Mode Default, Light Mode via toggle
+   ============================================================ */
+
+:root,
+[data-theme="dark"] {
+  /* Backgrounds */
+  --bg-base:          #060d1a;
+  --bg-card:          rgba(15, 23, 42, 0.85);
+  --bg-card-solid:    #0f172a;
+  --bg-elevated:      rgba(30, 41, 59, 0.7);
+  --bg-input:         rgba(15, 23, 42, 0.6);
+  --bg-hover:         rgba(51, 65, 85, 0.5);
+  --bg-active:        rgba(22, 163, 74, 0.15);
+
+  /* Text */
+  --text-primary:     #f1f5f9;
+  --text-secondary:   #cbd5e1;
+  --text-muted:       #64748b;
+  --text-subtle:      #475569;
+
+  /* Borders */
+  --border:           rgba(255, 255, 255, 0.08);
+  --border-strong:    rgba(255, 255, 255, 0.15);
+
+  /* Glass */
+  --glass-bg:         rgba(15, 23, 42, 0.75);
+  --glass-border:     rgba(255, 255, 255, 0.08);
+
+  /* Shadows */
+  --shadow-sm:        rgba(0, 0, 0, 0.3);
+  --shadow-md:        rgba(0, 0, 0, 0.5);
+
+  /* Brand */
+  --color-primary:    22 163 74;
+  --color-accent:     217 119 6;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-theme="light"] {
+  /* Backgrounds */
+  --bg-base:          #f1f5f9;
+  --bg-card:          #ffffff;
+  --bg-card-solid:    #ffffff;
+  --bg-elevated:      #f8fafc;
+  --bg-input:         #f8fafc;
+  --bg-hover:         #f1f5f9;
+  --bg-active:        rgba(22, 163, 74, 0.08);
+
+  /* Text */
+  --text-primary:     #0f172a;
+  --text-secondary:   #334155;
+  --text-muted:       #64748b;
+  --text-subtle:      #94a3b8;
+
+  /* Borders */
+  --border:           rgba(15, 23, 42, 0.1);
+  --border-strong:    rgba(15, 23, 42, 0.2);
+
+  /* Glass */
+  --glass-bg:         rgba(255, 255, 255, 0.92);
+  --glass-border:     rgba(15, 23, 42, 0.08);
+
+  /* Shadows */
+  --shadow-sm:        rgba(0, 0, 0, 0.05);
+  --shadow-md:        rgba(0, 0, 0, 0.1);
+
+  /* Brand */
+  --color-primary:    22 163 74;
+  --color-accent:     217 119 6;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ============================================================
+   Base Styles
+   ============================================================ */
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ============================================================
+   Scrollbar
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-elevated); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #16a34a; }
+
+/* ============================================================
+   Core Utility Classes (Theme-Aware)
+   ============================================================ */
+
+/* Glass morphism */
+.glass {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 4px 6px -1px var(--shadow-sm);
+}
+
+/* Themed card (replaces bg-slate-800/60 in Card.tsx) */
+.themed-card {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+/* Gradient brand */
+.gradient-brand {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #4ade80 100%);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card hover */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px var(--shadow-sm);
+}
+
+/* Shimmer loading */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 25%,
+    var(--bg-hover) 50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* Pulse dot */
+.pulse-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 0 rgba(22,163,74,0.4);
+  animation: pulse-ring 2s infinite;
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(22,163,74,0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(22,163,74,0);   }
+  100% { box-shadow: 0 0 0 0   rgba(22,163,74,0);   }
+}
+
+/* Fade in */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Safe area + nav offset */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.mb-nav { margin-bottom: 80px; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ============================================================
+   Status Badge Colors (Invariant — always high contrast)
+   ============================================================ */
+.badge-yellow { background: rgba(217,119,6,0.12); color: #f59e0b; border: 1px solid rgba(217,119,6,0.25); }
+.badge-blue   { background: rgba(37,99,235,0.12);  color: #60a5fa; border: 1px solid rgba(37,99,235,0.25); }
+.badge-green  { background: rgba(22,163,74,0.12);  color: #4ade80; border: 1px solid rgba(22,163,74,0.25); }
+.badge-orange { background: rgba(234,88,12,0.12);  color: #fb923c; border: 1px solid rgba(234,88,12,0.25); }
+.badge-purple { background: rgba(147,51,234,0.12); color: #c084fc; border: 1px solid rgba(147,51,234,0.25); }
+.badge-red    { background: rgba(220,38,38,0.12);  color: #f87171; border: 1px solid rgba(220,38,38,0.25); }
+.badge-teal   { background: rgba(13,148,136,0.12); color: #2dd4bf; border: 1px solid rgba(13,148,136,0.25); }
+.badge-gray   { background: rgba(71,85,105,0.12);  color: #94a3b8; border: 1px solid rgba(71,85,105,0.25); }
+
+/* ============================================================
+   Light Mode Overrides — Badge contrast correction
+   ============================================================ */
+[data-theme="light"] .badge-yellow { background: rgba(217,119,6,0.1);  color: #b45309; border: 1px solid rgba(217,119,6,0.2); }
+[data-theme="light"] .badge-blue   { background: rgba(37,99,235,0.08); color: #1d4ed8; border: 1px solid rgba(37,99,235,0.18); }
+[data-theme="light"] .badge-green  { background: rgba(22,163,74,0.1);  color: #15803d; border: 1px solid rgba(22,163,74,0.2); }
+[data-theme="light"] .badge-orange { background: rgba(234,88,12,0.1);  color: #c2410c; border: 1px solid rgba(234,88,12,0.2); }
+[data-theme="light"] .badge-purple { background: rgba(147,51,234,0.1); color: #7e22ce; border: 1px solid rgba(147,51,234,0.2); }
+[data-theme="light"] .badge-red    { background: rgba(220,38,38,0.1);  color: #b91c1c; border: 1px solid rgba(220,38,38,0.2); }
+[data-theme="light"] .badge-teal   { background: rgba(13,148,136,0.1); color: #0f766e; border: 1px solid rgba(13,148,136,0.2); }
+[data-theme="light"] .badge-gray   { background: rgba(71,85,105,0.1);  color: #334155; border: 1px solid rgba(71,85,105,0.2); }
+
+/* ============================================================
+   Light Mode — Global text color overrides
+   ============================================================ */
+[data-theme="light"] body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+/* In light mode: dark-themed text classes become readable dark text */
+[data-theme="light"] .text-white    { color: #0f172a !important; }
+[data-theme="light"] .text-slate-50 { color: #0f172a !important; }
+[data-theme="light"] .text-slate-100 { color: #0f172a !important; }
+[data-theme="light"] .text-slate-200 { color: #1e293b !important; }
+[data-theme="light"] .text-slate-300 { color: #334155 !important; }
+[data-theme="light"] .text-slate-400 { color: #475569 !important; }
+[data-theme="light"] .text-slate-500 { color: #64748b !important; }
+
+/* In light mode: accent/color overrides for legibility */
+[data-theme="light"] .text-green-400  { color: #16a34a !important; }
+[data-theme="light"] .text-green-300  { color: #15803d !important; }
+[data-theme="light"] .text-red-400    { color: #dc2626 !important; }
+[data-theme="light"] .text-amber-400  { color: #d97706 !important; }
+[data-theme="light"] .text-yellow-400 { color: #ca8a04 !important; }
+[data-theme="light"] .text-blue-400   { color: #2563eb !important; }
+[data-theme="light"] .text-purple-400 { color: #9333ea !important; }
+[data-theme="light"] .text-teal-400   { color: #0d9488 !important; }
+[data-theme="light"] .text-amber-300  { color: #b45309 !important; }
+
+/* In light mode: dark backgrounds become light */
+[data-theme="light"] .bg-slate-950  { background-color: #f1f5f9 !important; }
+[data-theme="light"] .bg-slate-900  { background-color: #f8fafc !important; }
+[data-theme="light"] .bg-slate-800  { background-color: #f1f5f9 !important; }
+
+/* ============================================================
+   Light Mode — Input & Select
+   ============================================================ */
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+[data-theme="light"] option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* ============================================================
+   Light Mode — Layout backgrounds  
+   ============================================================ */
+[data-theme="light"] .glass {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04) !important;
+}
+
+/* Button variants in light mode */
+[data-theme="light"] .bg-slate-800\/60,
+[data-theme="light"] .bg-slate-800\/40,
+[data-theme="light"] .bg-slate-800\/80 {
+  background-color: rgba(241, 245, 249, 0.95) !important;
+}
+
+[data-theme="light"] .border-slate-700\/50 { border-color: rgba(15,23,42,0.1) !important; }
+[data-theme="light"] .border-slate-700\/30 { border-color: rgba(15,23,42,0.07) !important; }
+
+/* ============================================================
+   Light Mode — Specific component fixes
+   ============================================================ */
+
+/* Scrollbar light */
+[data-theme="light"] ::-webkit-scrollbar-track { background: #f1f5f9; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+/* Shimmer light */
+[data-theme="light"] .shimmer {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+}
+
+/* Toaster light mode */
+[data-theme="light"] .react-hot-toast {
+  background: #ffffff !important;
+  color: #0f172a !important;
 }
