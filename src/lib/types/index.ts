@@ -109,6 +109,11 @@ export interface OrderItem {
   price_at_order: number
   subtotal: number
   notes: string | null
+  order_mode: 'by_quantity' | 'by_budget'
+  budget_amount: number | null
+  item_status?: string
+  cancel_reason?: string | null
+  substitute_for?: string | null
   created_at: string
   // Joined
   product?: Product
@@ -201,6 +206,8 @@ export interface CartItem {
   product: Product
   quantity: number
   notes?: string
+  orderMode?: 'by_quantity' | 'by_budget'
+  budgetAmount?: number
 }
 
 export interface Cart {

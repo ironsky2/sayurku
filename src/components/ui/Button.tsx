@@ -50,7 +50,7 @@ export function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
+      {loading && <Loader2 className="w-4 h-4 animate-spin" />}
       {children}
     </button>
   )

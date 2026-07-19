@@ -20,6 +20,8 @@ interface WeighRow {
   actualQty: number
   pricePerUnit: number
   notes?: string
+  isBudget: boolean
+  budgetAmount: number
 }
 
 interface ProductGroup {
@@ -47,7 +49,7 @@ export default function BulkWeighPage() {
         .select(`
           id,
           customer:profiles!orders_customer_id_fkey(full_name, phone),
-          order_items(id, product_id, quantity, unit, price_at_order, notes, product:products(name, unit, price_per_unit))
+          order_items(id, product_id, quantity, unit, price_at_order, notes, order_mode, budget_amount, product:products(name, unit, price_per_unit))
         `)
         .in('status', ['confirmed', 'shopping'])
         .order('created_at', { ascending: true })
@@ -74,6 +76,8 @@ export default function BulkWeighPage() {
       for (const order of (orders || [])) {
         for (const item of (order.order_items || [] as any[])) {
           const prod = Array.isArray(item.product) ? item.product[0] : item.product as any
+          const isBudget = item.order_mode === 'by_budget'
+          const budgetAmount = Number(item.budget_amount || 0)
           const suggested = dpMap[item.product_id] ?? prod?.price_per_unit ?? 0
           allRows.push({
             orderItemId: item.id,
@@ -84,9 +88,13 @@ export default function BulkWeighPage() {
             productName: prod?.name || '',
             unit: item.unit || prod?.unit || '',
             orderedQty: Number(item.quantity),
-            actualQty: Number(item.quantity),
-            pricePerUnit: Number(item.price_at_order) > 0 ? Number(item.price_at_order) : suggested,
+            actualQty: Number(item.quantity) || 0,
+            pricePerUnit: isBudget
+              ? (budgetAmount > 0 && Number(item.quantity) > 0 ? budgetAmount / Number(item.quantity) : 0)
+              : (Number(item.price_at_order) > 0 ? Number(item.price_at_order) : suggested),
             notes: item.notes,
+            isBudget,
+            budgetAmount,
           })
         }
       }
@@ -132,10 +140,15 @@ export default function BulkWeighPage() {
   }
 
   const handleSaveAll = async () => {
-    // Validate: all items must have price
-    const missingPrice = groups.flatMap(g => g.rows).filter(r => r.pricePerUnit <= 0)
+    // Validate: all by_quantity items must have price; budget items just need actual qty
+    const missingPrice = groups.flatMap(g => g.rows).filter(r => !r.isBudget && r.pricePerUnit <= 0)
+    const missingQty   = groups.flatMap(g => g.rows).filter(r => r.isBudget && r.actualQty <= 0)
     if (missingPrice.length > 0) {
       toast.error(`Masukkan harga untuk: ${[...new Set(missingPrice.map(r => r.productName))].join(', ')}`)
+      return
+    }
+    if (missingQty.length > 0) {
+      toast.error(`Masukkan berat aktual untuk: ${[...new Set(missingQty.map(r => r.productName))].join(', ')}`)
       return
     }
 
@@ -144,21 +157,32 @@ export default function BulkWeighPage() {
       // Save all order_items
       const allRows = groups.flatMap(g => g.rows)
       for (const row of allRows) {
-        await supabase.from('order_items').update({
-          quantity: row.actualQty,
-          price_at_order: row.pricePerUnit,
-        }).eq('id', row.orderItemId)
+        if (row.isBudget) {
+          // Budget item: actual qty is what admin weighed, price = budget / actual_qty
+          const pricePerUnit = row.actualQty > 0 ? Math.round(row.budgetAmount / row.actualQty) : 0
+          await supabase.from('order_items').update({
+            quantity: row.actualQty,
+            price_at_order: pricePerUnit,
+          }).eq('id', row.orderItemId)
+        } else {
+          await supabase.from('order_items').update({
+            quantity: row.actualQty,
+            price_at_order: row.pricePerUnit,
+          }).eq('id', row.orderItemId)
+        }
       }
 
       // Update order totals and mark as ready
       const orderIds = [...new Set(allRows.map(r => r.orderId))]
       for (const orderId of orderIds) {
         const orderRows = allRows.filter(r => r.orderId === orderId)
-        const newTotal = orderRows.reduce((s, r) => s + r.actualQty * r.pricePerUnit, 0)
+        // Budget items: use budgetAmount (fixed). Qty items: use actualQty × pricePerUnit
+        const newTotal = orderRows.reduce((s, r) =>
+          s + (r.isBudget ? r.budgetAmount : r.actualQty * r.pricePerUnit), 0)
         await supabase.from('orders').update({ total_price: newTotal, status: 'ready' }).eq('id', orderId)
       }
 
-      toast.success(`✅ ${orderIds.length} pesanan berhasil ditimbang & ditandai Siap Kirim!`)
+      toast.success(`${orderIds.length} pesanan berhasil ditimbang & ditandai Siap Kirim!`)
       loadData()
     } catch (err: any) {
       toast.error(err.message || 'Gagal menyimpan')
@@ -257,28 +281,34 @@ export default function BulkWeighPage() {
                       </p>
                     </div>
                   </div>
-                  {/* Shared price input for entire product group */}
-                  <div className="flex items-center gap-2 print:hidden">
-                    <span className="text-xs text-slate-400 whitespace-nowrap">Harga /{group.unit}:</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={group.rows[0]?.pricePerUnit || ''}
-                      onChange={(e) => applyPriceToGroup(group.productId, Number(e.target.value))}
-                      className="w-28 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-                      placeholder="Rp/unit"
-                    />
-                    <button
-                      onClick={() => applyPriceToGroup(group.productId, group.suggestedPrice)}
-                      className="text-[10px] text-green-400 hover:text-green-300 bg-green-500/10 border border-green-500/20 px-2 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1"
-                    >
-                      <Zap className="w-3 h-3" />
-                      Sugesti {formatRupiah(group.suggestedPrice)}
-                    </button>
-                    <span className="text-xs font-bold text-green-400 whitespace-nowrap">
-                      = {formatRupiah(groupTotal)}
+                  {/* Shared price input - only for non-budget groups */}
+                  {group.rows.some(r => !r.isBudget) && (
+                    <div className="flex items-center gap-2 print:hidden">
+                      <span className="text-xs text-slate-400 whitespace-nowrap">Harga /{group.unit}:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={group.rows.find(r => !r.isBudget)?.pricePerUnit || ''}
+                        onChange={(e) => applyPriceToGroup(group.productId, Number(e.target.value))}
+                        className="w-28 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
+                        placeholder="Rp/unit"
+                      />
+                      <button
+                        onClick={() => applyPriceToGroup(group.productId, group.suggestedPrice)}
+                        className="text-[10px] text-green-400 hover:text-green-300 bg-green-500/10 border border-green-500/20 px-2 py-1.5 rounded-lg whitespace-nowrap"
+                      >
+                        Sugesti {formatRupiah(group.suggestedPrice)}
+                      </button>
+                      <span className="text-xs font-bold text-green-400 whitespace-nowrap">
+                        = {formatRupiah(groupTotal)}
+                      </span>
+                    </div>
+                  )}
+                  {group.rows.every(r => r.isBudget) && (
+                    <span className="text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg">
+                      Per Nominal — Total Budget: {formatRupiah(group.rows.reduce((s, r) => s + r.budgetAmount, 0))}
                     </span>
-                  </div>
+                  )}
                 </div>
 
                 {/* Rows table */}
@@ -300,12 +330,17 @@ export default function BulkWeighPage() {
                         <tr key={row.orderItemId} className={`border-b border-slate-700/20 last:border-0 ${idx % 2 === 0 ? '' : 'bg-slate-800/10'}`}>
                           <td className="px-5 py-3">
                             <p className="font-semibold text-white print:text-black text-sm">{row.customerName}</p>
+                            {row.isBudget && (
+                              <span className="inline-block text-[9px] font-bold bg-blue-600/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded mt-0.5">Per Nominal</span>
+                            )}
                             {row.notes && (
-                              <p className="text-[10px] text-amber-400 mt-0.5">📝 {row.notes}</p>
+                              <p className="text-[10px] text-amber-400 mt-0.5">{row.notes}</p>
                             )}
                           </td>
                           <td className="px-5 py-3 text-center text-slate-300 print:text-black font-mono text-xs">
-                            {row.orderedQty} {row.unit}
+                            {row.isBudget
+                              ? <span className="text-blue-400 font-bold">{formatRupiah(row.budgetAmount)}</span>
+                              : <>{row.orderedQty} {row.unit}</>}
                           </td>
                           {/* Editable qty */}
                           <td className="px-5 py-3 text-center print:hidden">
@@ -313,20 +348,34 @@ export default function BulkWeighPage() {
                               type="number"
                               min="0"
                               step="0.01"
-                              value={row.actualQty}
+                              value={row.actualQty || ''}
                               onChange={(e) => updateRow(row.orderItemId, 'actualQty', Number(e.target.value))}
-                              className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className={`w-20 bg-slate-800 border rounded-lg px-2 py-1.5 text-xs text-white text-center focus:outline-none focus:ring-1 ${
+                                row.isBudget ? 'border-blue-500/40 focus:ring-blue-500' : 'border-slate-700 focus:ring-green-500'
+                              }`}
+                              placeholder={row.isBudget ? 'kg dapat' : '0'}
                             />
                           </td>
                           <td className="px-5 py-3 text-right font-bold print:hidden">
-                            <span className={row.pricePerUnit > 0 ? 'text-green-400' : 'text-amber-500 text-xs'}>
-                              {row.pricePerUnit > 0 ? formatRupiah(row.actualQty * row.pricePerUnit) : 'Belum diisi'}
-                            </span>
+                            {row.isBudget ? (
+                              <span className="text-blue-400">
+                                {formatRupiah(row.budgetAmount)}
+                                <span className="text-[9px] text-blue-500 block font-normal">Fixed</span>
+                              </span>
+                            ) : (
+                              <span className={row.pricePerUnit > 0 ? 'text-green-400' : 'text-amber-500 text-xs'}>
+                                {row.pricePerUnit > 0 ? formatRupiah(row.actualQty * row.pricePerUnit) : 'Belum diisi'}
+                              </span>
+                            )}
                           </td>
                           {/* Print columns */}
                           <td className="px-5 py-3 text-right hidden print:table-cell font-mono text-xs">{row.actualQty} {row.unit}</td>
-                          <td className="px-5 py-3 text-right hidden print:table-cell font-mono text-xs">{formatRupiah(row.pricePerUnit)}</td>
-                          <td className="px-5 py-3 text-right hidden print:table-cell font-bold">{formatRupiah(row.actualQty * row.pricePerUnit)}</td>
+                          <td className="px-5 py-3 text-right hidden print:table-cell font-mono text-xs">
+                            {row.isBudget ? `Budget: ${formatRupiah(row.budgetAmount)}` : formatRupiah(row.pricePerUnit)}
+                          </td>
+                          <td className="px-5 py-3 text-right hidden print:table-cell font-bold">
+                            {row.isBudget ? formatRupiah(row.budgetAmount) : formatRupiah(row.actualQty * row.pricePerUnit)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -351,9 +400,8 @@ export default function BulkWeighPage() {
               size="lg"
               loading={saving}
               onClick={handleSaveAll}
-              icon={<CheckCircle className="w-5 h-5" />}
             >
-              ✅ Simpan Semua & Tandai Siap Kirim ({totalOrders} pesanan)
+              Simpan Semua & Tandai Siap Kirim ({totalOrders} pesanan)
             </Button>
           </div>
         </div>

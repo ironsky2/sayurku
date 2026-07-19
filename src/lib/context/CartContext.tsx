@@ -5,10 +5,12 @@ import { CartItem, Product } from '@/lib/types'
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (product: Product, quantity: number, notes?: string) => void
+  addItem: (product: Product, quantity: number, notes?: string, orderMode?: 'by_quantity' | 'by_budget', budgetAmount?: number) => void
   removeItem: (productId: string) => void
   updateQuantity: (productId: string, quantity: number) => void
   updateNotes: (productId: string, notes: string) => void
+  updateBudget: (productId: string, budgetAmount: number) => void
+  setItemOrderMode: (productId: string, mode: 'by_quantity' | 'by_budget', budgetAmount?: number) => void
   clearCart: () => void
   totalItems: number
   totalPrice: number
@@ -34,17 +36,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('sayurku_cart', JSON.stringify(items))
   }, [items])
 
-  const addItem = (product: Product, quantity: number, notes?: string) => {
+  const addItem = (
+    product: Product,
+    quantity: number,
+    notes?: string,
+    orderMode: 'by_quantity' | 'by_budget' = 'by_quantity',
+    budgetAmount?: number
+  ) => {
     setItems((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
+        // If same product already in cart, just update quantity (keep existing mode)
         return prev.map((item) =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity, notes: notes || item.notes }
+            ? {
+                ...item,
+                quantity: item.orderMode === 'by_budget' ? item.quantity : item.quantity + quantity,
+                notes: notes || item.notes,
+              }
             : item
         )
       }
-      return [...prev, { product, quantity, notes }]
+      return [...prev, { product, quantity, notes, orderMode, budgetAmount }]
     })
   }
 
@@ -72,17 +85,62 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     )
   }
 
+  const updateBudget = (productId: string, budgetAmount: number) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.product.id === productId
+          ? { ...item, budgetAmount, orderMode: 'by_budget' }
+          : item
+      )
+    )
+  }
+
+  const setItemOrderMode = (
+    productId: string,
+    mode: 'by_quantity' | 'by_budget',
+    budgetAmount?: number
+  ) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.product.id === productId
+          ? {
+              ...item,
+              orderMode: mode,
+              budgetAmount: mode === 'by_budget' ? (budgetAmount ?? item.budgetAmount ?? 5000) : undefined,
+              quantity: mode === 'by_budget' ? 1 : item.quantity,
+            }
+          : item
+      )
+    )
+  }
+
   const clearCart = () => setItems([])
 
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-  const totalPrice = items.reduce(
-    (sum, item) => sum + item.product.price_per_unit * item.quantity,
-    0
-  )
+  // totalItems: count all items in cart
+  const totalItems = items.length
+
+  // totalPrice: for by_budget items use budgetAmount, for by_quantity use qty × price_per_unit
+  const totalPrice = items.reduce((sum, item) => {
+    if (item.orderMode === 'by_budget') {
+      return sum + (item.budgetAmount ?? 0)
+    }
+    return sum + item.product.price_per_unit * item.quantity
+  }, 0)
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, updateNotes, clearCart, totalItems, totalPrice }}
+      value={{
+        items,
+        addItem,
+        removeItem,
+        updateQuantity,
+        updateNotes,
+        updateBudget,
+        setItemOrderMode,
+        clearCart,
+        totalItems,
+        totalPrice,
+      }}
     >
       {children}
     </CartContext.Provider>

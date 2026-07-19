@@ -97,10 +97,12 @@ export default function CheckoutPage() {
       const orderItems = items.map((item) => ({
         order_id: order.id,
         product_id: item.product.id,
-        quantity: item.quantity,
+        quantity: item.orderMode === 'by_budget' ? 0 : item.quantity, // weight unknown for budget items
         unit: item.product.unit,
-        price_at_order: 0, // Finalized after weighing harian
+        price_at_order: 0, // Finalized after weighing
         notes: item.notes || null,
+        order_mode: item.orderMode || 'by_quantity',
+        budget_amount: item.orderMode === 'by_budget' ? (item.budgetAmount || 0) : null,
       }))
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
