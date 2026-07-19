@@ -54,7 +54,7 @@ export default async function HomePage() {
           </p>
 
           {/* Quick stats */}
-          <div className="flex gap-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
             {[
               { icon: Leaf, label: 'Segar Setiap Hari' },
               { icon: Clock, label: 'PO Tersedia' },
@@ -62,9 +62,9 @@ export default async function HomePage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="flex items-center gap-1.5 bg-white rounded-xl px-3 py-2 border border-green-200/60 shadow-sm"
+                className="flex-shrink-0 flex items-center gap-1.5 bg-white rounded-xl px-2.5 py-1.5 border border-green-200/60 shadow-sm"
               >
-                <stat.icon className="w-3.5 h-3.5 text-green-600" />
+                <stat.icon className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                 <span className="text-xs text-slate-700 font-semibold whitespace-nowrap">
                   {stat.label}
                 </span>
