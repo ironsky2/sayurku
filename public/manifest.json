@@ -1,5 +1,6 @@
 {
-  "name": "SayurKu",
+  "id": "sayurku-app",
+  "name": "SayurKu — Sayur Segar Online",
   "short_name": "SayurKu",
   "description": "Belanja sayur segar online, langsung ke rumah!",
   "start_url": "/",
